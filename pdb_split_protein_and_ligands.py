@@ -9,9 +9,9 @@ import argparse
 
 def readPDB(PDB_ID, parse_type):
     
-    def pdbParseClean(line):
+    def pdbParseClean(line,atom_type):
         field_chain = line[21].replace(" ","")
-        field_record = "ATOM"
+        field_record = atom_type
         field_serial = line[6:12].replace(" ","")
         field_notsure = line[12].replace(" ","")
         field_atom = line[13:16].replace(" ","")
@@ -39,7 +39,7 @@ def readPDB(PDB_ID, parse_type):
             for line in infFile:
                 line = line.replace("\n","")
                 if line.startswith(atom_type):
-                    field_record,field_serial,field_atom,field_altLoc,field_resname,field_chain,field_resseq,field_inser,field_x,field_y,field_z,field_occ,field_temp,field_element,field_notsure = pdbParseClean(line)
+                    field_record,field_serial,field_atom,field_altLoc,field_resname,field_chain,field_resseq,field_inser,field_x,field_y,field_z,field_occ,field_temp,field_element,field_notsure = pdbParseClean(line, atom_type)
 
                     field_array = [field_record,field_serial,field_atom,field_altLoc,field_resname,field_chain,field_resseq,field_inser,field_x,field_y,field_z,field_occ,field_temp,field_element,field_notsure]
                     pdb_columns = ["record","serial","atom","altLoc","resname","chain","resseq","insertion","x","y","z","occ","temp","element","notsure"]
@@ -121,6 +121,19 @@ def writePDB(df,name):
 
     outputPDB.close()
 
+def individual_excipients(df):
+    unique_exp = df.resseq.unique()
+
+    unique_df_array = []
+    unique_id_array = []
+
+    for resseqid in unique_exp:
+        unique_df = df[df["resseq"] == resseqid].copy(deep=True)
+        unique_df_array.append(unique_df)
+        unique_id_array.append(resseqid)
+
+    return unique_df_array, unique_id_array
+
 
 if __name__ == "__main__":
 
@@ -129,8 +142,9 @@ if __name__ == "__main__":
     parser.add_argument("--ligands", type=str, help="ligands to be separated")
     args = parser.parse_args()
 
-    inputfile      = args.PDB
-    excipient_list = args.ligands.split(",")
+    inputfile             = args.PDB
+    excipient_list        = args.ligands.split(",")
+    unique_excipient_list = []
 
     PDB_basename   = os.path.basename(inputfile)
     PDB_ID         = os.path.splitext(PDB_basename)[0]
@@ -146,9 +160,18 @@ if __name__ == "__main__":
 
             for excipient in excipient_list:
                 exp_df = HET_df[HET_df["resname"] == excipient].copy(deep=True)
+
                 if len(exp_df) > 0:
-                    print(f"Making pdb file for excipient {excipient}")
-                    writePDB(exp_df,PDB_ID+"_excipient_"+excipient)
+                    unique_df_array, unique_id_array = individual_excipients(exp_df)
+
+                    for idx, df in enumerate(unique_df_array):
+                        writePDB(df,PDB_ID+"_excipient_"+excipient+"_"+unique_id_array[idx])
+                        combined_df = pd.concat([protein_df,df])
+                        writePDB(combined_df,PDB_ID+"_protein_excipient_"+excipient+"_"+unique_id_array[idx])
+                        unique_excipient_list.append(excipient+"_"+unique_id_array[idx])
+
+                        print(f"Making pdb files for excipient {excipient}{unique_id_array[idx]}")
+                        writePDB(exp_df,PDB_ID+"_excipient_"+excipient)
                 else:
                     print(f"{excipient} not present in structure")
     else:
