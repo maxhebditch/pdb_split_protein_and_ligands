@@ -7,116 +7,82 @@ import os
 import sys
 import argparse
 
-def readPDB(PDB_ID, parse_type):
+def readPDB(PDB_ID):
+    def pdbParseClean(line):
+
+        if line.startswith("ATOM"):
+            field_record = "ATOM"
+        if line.startswith("HETATM"):
+            field_record = "HETATM"
+
+        field_chain   = line[21]
+        field_serial  = line[6:12]
+        field_notsure = line[12]
+        field_atom    = line[13:16]
+        field_altLoc  = line[16]
+        field_resname = line[17:20]
+
+        field_inser   = line[26]
+        field_resseq  = line[23:26]
+        field_x       = line[30:38]
+        field_y       = line[38:46]
+        field_z       = line[46:54]
+        field_occ     = line[54:60]
+        field_temp    = line[60:67]
+        field_element = line[76:80]
+
+        return [field_record,field_serial,field_atom,field_altLoc,field_resname,field_chain,field_resseq,field_inser,field_x,field_y,field_z,field_occ,field_temp,field_element,field_notsure]
+
+    pdb_array = []
+
+    pdb_columns = ["record","serial","atom","altLoc","resname","chain","resseq","insertion","x","y","z","occ","temp","element","notsure"]
     
-    def pdbParseClean(line,atom_type):
-        field_chain = line[21].replace(" ","")
-        field_record = atom_type
-        field_serial = line[6:12].replace(" ","")
-        field_notsure = line[12].replace(" ","")
-        field_atom = line[13:16].replace(" ","")
-        field_altLoc = line[16].replace(" ","")
-        field_resname = line[17:20].replace(" ","")
+    with open(PDB_ID,"r") as infFile:
+        for line in infFile:
+            line = line.replace("\n","")
 
-        field_inser = line[26].replace(" ","")
-        field_resseq = line[23:26].replace(" ","")
-        field_x = float(line[30:38].replace(" ",""))
-        field_y = float(line[38:46].replace(" ",""))
-        field_z = float(line[46:54].replace(" ",""))
-        field_occ = line[54:60].replace(" ","")
-        field_temp = line[60:67].replace(" ","")
-        field_element = line[76:80].replace(" ","")
+            if line.startswith("ATOM") or line.startswith("HETATM"):
 
-        return field_record,field_serial,field_atom,field_altLoc,field_resname,field_chain,field_resseq,field_inser,field_x,field_y,field_z,field_occ,field_temp,field_element,field_notsure
+                line_array = pdbParseClean(line)
+                line_array = [i.replace(" ","") for i in line_array]
 
+                if len(line) > 80:
+                        field_charge = line[78:80]
+                        line_array.append(field_charge)
+                        pdb_columns.append("charge")
+
+                pdb_array.append(line_array)
+
+
+    pdb_df = pd.DataFrame.from_records(pdb_array, columns=pdb_columns)
+
+    return pdb_df
     
-    def parsePDB(PDB_ID,atom_type):
-        
-        pdb_name = PDB_ID+".pdb"
-        pdb = []
-        
-        with open(pdb_name,"r") as infFile:
-            for line in infFile:
-                line = line.replace("\n","")
-                if line.startswith(atom_type):
-                    field_record,field_serial,field_atom,field_altLoc,field_resname,field_chain,field_resseq,field_inser,field_x,field_y,field_z,field_occ,field_temp,field_element,field_notsure = pdbParseClean(line, atom_type)
-
-                    field_array = [field_record,field_serial,field_atom,field_altLoc,field_resname,field_chain,field_resseq,field_inser,field_x,field_y,field_z,field_occ,field_temp,field_element,field_notsure]
-                    pdb_columns = ["record","serial","atom","altLoc","resname","chain","resseq","insertion","x","y","z","occ","temp","element","notsure"]
-
-                    if len(line) > 80:
-                            field_charge = line[78:80]
-                            field_array.append(field_charge)
-                            pdb_columns.append("charge")
-
-                    pdb.append(field_array)
-
-
-        pdb_df = pd.DataFrame.from_records(np.array(pdb), columns=pdb_columns)
-
-        return pdb_df
-    
-    if parse_type == "protein":
-        return parsePDB(PDB_ID,"ATOM")
-    if parse_type == "excipient":
-        return parsePDB(PDB_ID,"HETATM")
-
-
 def writePDB(df,name):
     def writelines(row,cleanChain):    
-        #cleanChain.write(row)
-        crow = row.str.strip()
-        #ATOM record
-        cleanChain.write(crow[0].ljust(6))
-        #Serial
-        cleanChain.write(crow[1].rjust(5))
-        cleanChain.write(" ")
-        if crow[14] != "":
-            cleanChain.write(crow[14])
+        write_string = row[0].ljust(6)+row[1].rjust(5)+" "
+
+        if row[14] != "":
+            write_string = write_string+row[14]
         else:
-            cleanChain.write(" ")
-        #Atom name
-        cleanChain.write(crow[2].ljust(3))
-        #Altloc
-        cleanChain.write(crow[3].ljust(1))
-        #resname
-        cleanChain.write(crow[4].ljust(4))
-        #chain
-        cleanChain.write(crow[5].ljust(2))
-        #number
-        cleanChain.write(crow[6].rjust(3))
-        #if any(c.isalpha() for c in crow[6]):
-        cleanChain.write("")
+            write_string = write_string+" "
 
-        cleanChain.write(crow[7].ljust(1))
-        cleanChain.write("   ")
+        write_string = write_string+row[2].ljust(3)+row[3].ljust(1)+row[4].ljust(4)+row[5].ljust(2)+row[6].rjust(3)+row[7].ljust(1)+"   "+row[8].rjust(8)+row[9].rjust(8)+row[10].rjust(8)+"  "+row[11].ljust(3)+" "+row[12].rjust(5)
 
-        #xyz
-        cleanChain.write(crow[8].rjust(8))
-        cleanChain.write("")
-        cleanChain.write(crow[9].rjust(8))
-        cleanChain.write("")
-        cleanChain.write(crow[10].rjust(8))
-        cleanChain.write("  ")
-
-        #occ
-        cleanChain.write(crow[11].ljust(3))
-        cleanChain.write(" ")
-        #temp
-        cleanChain.write(crow[12].rjust(5))
-        if len(crow[12]) > 5:
-            cleanChain.write("          ")
+        if len(row[12]) > 5:
+            write_string = write_string+"          "
         else:
-            cleanChain.write("           ")
-        #element
-        cleanChain.write(crow[13].ljust(3))
-        cleanChain.write("\n")
+            write_string = write_string+"           "
+
+        write_string=write_string+row[13].ljust(3)+"\n"
+
+        cleanChain.write(write_string)
 
     pdbName      = name+".pdb" 
     outputPDB    = open(pdbName,"w")
     df["serial"] = df["serial"].astype(str)
 
-    for i, row in df.iterrows():
+    for row in df.itertuples(index=False):
         writelines(row,outputPDB)
 
     outputPDB.close()
@@ -151,28 +117,37 @@ if __name__ == "__main__":
 
     if os.path.isfile(inputfile):
         try:
-            HET_df = readPDB(PDB_ID,parse_type="excipient")
+            whole_pdb_df = readPDB(inputfile)
         except:
-            print(f"{PDB_ID} no ligands in pdb")
+            print(f"Couldn't read {PDB_ID}")
         else:
-            protein_df = readPDB(PDB_ID,parse_type="protein")
-            writePDB(protein_df,PDB_ID+"_protein")
+            protein_df     =  whole_pdb_df[whole_pdb_df["record"] == "ATOM"].copy(deep=True)
 
-            for excipient in excipient_list:
-                exp_df = HET_df[HET_df["resname"] == excipient].copy(deep=True)
+            if len(protein_df) < 100000:
+                writePDB(protein_df,PDB_ID+"_protein")
+                HET_df     =  whole_pdb_df[whole_pdb_df["record"] == "HETATM"].copy(deep=True)
 
-                if len(exp_df) > 0:
+                print(f"{PDB_ID}")
+                print(f"Number of protein atoms: {len(protein_df)}")
+
+                for excipient in excipient_list:
+                    exp_df = HET_df[HET_df["resname"] == excipient].copy(deep=True)
+
                     unique_df_array, unique_id_array = individual_excipients(exp_df)
 
-                    for idx, df in enumerate(unique_df_array):
-                        writePDB(df,PDB_ID+"_excipient_"+excipient+"_"+unique_id_array[idx])
-                        combined_df = pd.concat([protein_df,df])
-                        writePDB(combined_df,PDB_ID+"_protein_excipient_"+excipient+"_"+unique_id_array[idx])
-                        unique_excipient_list.append(excipient+"_"+unique_id_array[idx])
+                    if len(unique_id_array) == 0:
+                        print(f"No excipient {excipient} found")
+                    else:
+                        print(f"Excipient {excipient} found")
 
-                        print(f"Making pdb files for excipient {excipient}{unique_id_array[idx]}")
-                        writePDB(exp_df,PDB_ID+"_excipient_"+excipient)
-                else:
-                    print(f"{excipient} not present in structure")
+                        for idx, df in enumerate(unique_df_array):
+                            combined_df = pd.concat([protein_df,df])
+                            writePDB(combined_df,PDB_ID+"_protein_excipient_"+excipient+"_"+unique_id_array[idx])
+                            unique_excipient_list.append(excipient+"_"+unique_id_array[idx])
+
+                print(f"Excipients: {' '.join(str(x) for x in unique_excipient_list)}\n")
+
+            else:
+                print("PDB too large, not writing")
     else:
         print(f"File {inputfile} not found")
