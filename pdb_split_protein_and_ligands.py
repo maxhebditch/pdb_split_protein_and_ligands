@@ -23,7 +23,7 @@ def readPDB(PDB_ID):
         field_resname = line[17:20]
 
         field_inser   = line[26]
-        field_resseq  = line[23:26]
+        field_resseq  = line[22:26]
         field_x       = line[30:38]
         field_y       = line[38:46]
         field_z       = line[46:54]
@@ -59,7 +59,8 @@ def readPDB(PDB_ID):
     return pdb_df
     
 def writePDB(df,name):
-    def writelines(row,cleanChain):    
+    def writelines(row,cleanChain):   
+        #record and serial
         write_string = row[0].ljust(6)+row[1].rjust(5)+" "
 
         if row[14] != "":
@@ -67,7 +68,8 @@ def writePDB(df,name):
         else:
             write_string = write_string+" "
 
-        write_string = write_string+row[2].ljust(3)+row[3].ljust(1)+row[4].ljust(4)+row[5].ljust(2)+row[6].rjust(3)+row[7].ljust(1)+"   "+row[8].rjust(8)+row[9].rjust(8)+row[10].rjust(8)+"  "+row[11].ljust(3)+" "+row[12].rjust(5)
+        #                               ATOM              altLOC       resname            chain         resseq          
+        write_string = write_string+row[2].ljust(3)+row[3].ljust(1)+row[4].ljust(3)+row[5].ljust(2)+row[6].rjust(3)+row[7].ljust(1)+"   "+row[8].rjust(8)+row[9].rjust(8)+row[10].rjust(8)+"  "+row[11].ljust(3)+" "+row[12].rjust(5)
 
         if len(row[12]) > 5:
             write_string = write_string+"          "
